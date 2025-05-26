@@ -97,7 +97,7 @@ def load_and_process_data(uploaded_file):
     df_cleaned = df_cleaned[
         (df_cleaned["Urządzenie"] == "SK Kolowrót") &
         (df_cleaned["Weryfikacja"] == "karta") &
-        (df_cleaned["Nazwisko"] != "Bendkowski")
+        (df_cleaned["Nazwisko"].str.strip() != "Bendkowski")
     ].copy()
     # 4) Enrich
     df_cleaned['Imię i Nazwisko'] = (

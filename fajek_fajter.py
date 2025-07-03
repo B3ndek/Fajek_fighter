@@ -162,62 +162,72 @@ def main():
     st.markdown('<div class="main-header">📊 Fajek Session Analyzer</div>', unsafe_allow_html=True)
 
     # --- Sidebar only ---
-    with st.sidebar:
-        st.header("📁 Upload & Filtry")
-        uploaded_file = st.file_uploader("Excel file", type=['xlsx','xls'])
-        if st.button("Clear All Filters"):
-            st.session_state.name_filt  = 'All'
+with st.sidebar:
+    st.header("📁 Upload & Filtry")
+    uploaded_file = st.file_uploader("Excel file", type=['xlsx','xls'])
+    
+    if st.button("Clear All Filters"):
+        st.session_state.name_filt  = 'All'
+        st.session_state.month_filt = 'All'
+
+    if uploaded_file:
+        # ZMIANA: wczytaj plik tylko raz i zapisz w session_state
+        if 'df_proc' not in st.session_state:
+            st.session_state.df_proc = load_and_process_data(uploaded_file)
+        df_proc = st.session_state.df_proc
+
+        # ZMIANA: miesiące jako stringi
+        months = ['All'] + [str(m) for m in sorted(df_proc['Miesiąc'].unique())]
+        names  = ['All'] + sorted(df_proc['Imię i Nazwisko'].unique())
+
+        # inicjalizacja filtrów
+        if 'name_filt' not in st.session_state:
+            st.session_state.name_filt = 'All'
+        if 'month_filt' not in st.session_state:
             st.session_state.month_filt = 'All'
 
-        if uploaded_file:
-            # load once
-            df_proc = load_and_process_data(uploaded_file)
-
-            # init filter state
-            if 'name_filt'  not in st.session_state: st.session_state.name_filt  = 'All'
-            if 'month_filt' not in st.session_state: st.session_state.month_filt = 'All'
-       
-            # dropdowns
-            names  = ['All'] + sorted(df_proc['Imię i Nazwisko'].unique())
-            months = ['All'] + sorted(df_proc['Miesiąc'].unique())       
-
-            st.session_state.name_filt  = st.selectbox("Imię i Nazwisko", options=names,  index=names.index(st.session_state.name_filt))
-            st.session_state.month_filt = st.selectbox("Miesiąc",        options=months, index=months.index(st.session_state.month_filt))
+        # dropdowny filtrów
+        st.session_state.name_filt = st.selectbox(
+            "Imię i Nazwisko",
+            options=names,
+            index=names.index(st.session_state.name_filt)
+        )
+        st.session_state.month_filt = st.selectbox(
+            "Miesiąc",
+            options=months,
+            index=months.index(st.session_state.month_filt)
+        )
             
     # --- Main area: tables ---
-    if 'uploaded_file' in locals() and uploaded_file:
-        df_proc = load_and_process_data(uploaded_file)
+if 'df_proc' in st.session_state:
+    df_proc = st.session_state.df_proc.copy()
 
-        # apply filters to main table
-        df_main = df_proc.copy()
-        if st.session_state.name_filt != 'All':
-            df_main = df_main[df_main['Imię i Nazwisko']==st.session_state.name_filt]
-        if st.session_state.month_filt != 'All':
-            df_main = df_main[df_main['Miesiąc']==st.session_state.month_filt]
+    # ZMIANA: przefiltruj dane przed raportem
+    df_filtered = df_proc.copy()
+    if st.session_state.name_filt != 'All':
+        df_filtered = df_filtered[
+            df_filtered['Imię i Nazwisko'] == st.session_state.name_filt
+        ]
+    if st.session_state.month_filt != 'All':
+        df_filtered = df_filtered[
+            df_filtered['Miesiąc'] == int(st.session_state.month_filt)
+        ]
 
-        # build and filter the reports
-        report, summary = build_report(df_proc)
-        df_report  = report.copy()
-        df_summary = summary.copy()
-        if st.session_state.name_filt  != 'All':
-            df_report  = df_report[df_report['Imię i Nazwisko']==st.session_state.name_filt]
-            df_summary = df_summary[df_summary['Imię i Nazwisko']==st.session_state.name_filt]
-        if st.session_state.month_filt != 'All':
-            df_report  = df_report[df_report['Start zmiany'].dt.month==st.session_state.month_filt]
-            df_summary = df_summary[df_summary['Shift_month']==st.session_state.month_filt]
+    # generuj raport i podsumowanie TYLKO na przefiltrowanych danych
+    report, summary = build_report(df_filtered)
 
-        # render in main window
-        st.subheader("1) Dane źródłowe")
-        st.dataframe(df_main, use_container_width=True)
+    # render danych źródłowych
+    st.subheader("1) Dane źródłowe")
+    st.dataframe(df_filtered, use_container_width=True)
 
-        st.subheader("2) Szczegółowy raport zmianowy")
-        st.dataframe(df_report, use_container_width=True)
+    # render raportów
+    st.subheader("2) Szczegółowy raport zmianowy")
+    st.dataframe(report, use_container_width=True)
 
-        st.subheader("3) Podsumowanie miesiąca")
-        st.dataframe(df_summary, use_container_width=True)
-
-    else:
-        st.write("Prześlij raport z Kołowrotka, by zacząć.")
+    st.subheader("3) Podsumowanie miesiąca")
+    st.dataframe(summary, use_container_width=True)
+else:
+    st.write("Prześlij raport z Kołowrotka, by zacząć.")
 
 if __name__ == "__main__":
     main()
